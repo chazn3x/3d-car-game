@@ -38,7 +38,17 @@ const environmentMapTexture = cubeTextureLoader.load([
  */
 const gltfLoader = new GLTFLoader()
 
-
+// Lamborghini Huracan
+let lamborghiniHuracan = null
+gltfLoader.load(
+    '/models/lamborghini_huracan.glb',
+    (gltf) => {
+        lamborghiniHuracan = gltf.scene
+        lamborghiniHuracan.scale.set(.5,.5,.5)
+        scene.add(lamborghiniHuracan)
+        console.log(lamborghiniHuracan);
+    }
+)
 
 /**
  * Floor
