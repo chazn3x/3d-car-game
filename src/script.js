@@ -47,6 +47,12 @@ gltfLoader.load(
         lamborghiniHuracan.scale.set(.5,.5,.5)
         scene.add(lamborghiniHuracan)
         console.log(lamborghiniHuracan);
+    },
+    () => {
+        console.log("progress");
+    },
+    () => {
+        console.log("error");
     }
 )
 
