@@ -52,40 +52,30 @@ const environmentMapTexture = cubeTextureLoader.load([
 // World
 const world = new CANNON.World()
 world.broadphase = new CANNON.SAPBroadphase(world)
-// world.allowSleep = true
+world.allowSleep = true
 world.gravity.set(0,-9.82,0)
 
 // Materials
-const defaultMaterial = new CANNON.Material('default')
-
-const phongMaterial = new THREE.MeshPhongMaterial()
-
 const groundMaterial = new CANNON.Material('groundMaterial')
-// groundMaterial.friction = 0.7
-groundMaterial.restitution = 0
-
 const wheelMaterial = new CANNON.Material('wheelMaterial')
-// wheelMaterial.friction = 0.2
-wheelMaterial.restitution = 0.4
-
-const groundWheelContactMaterial = new CANNON.ContactMaterial(
-    groundMaterial,
+const wheelGroundContactMaterial = new CANNON.ContactMaterial(
     wheelMaterial,
+    groundMaterial,
     {
         friction: .3,
         restitution: 0,
-        // contactEquationStiffness: 1000,
+        contactEquationStiffness: 1000,
     }
 )
-world.addContactMaterial(groundWheelContactMaterial)
-// world.defaultContactMaterial = defaultContactMaterial
+world.addContactMaterial(wheelGroundContactMaterial)
+world.defaultContactMaterial.friction = 0
 
 /**
  * Floor
  */
 // Three.js
 const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(100, 100),
+    new THREE.PlaneGeometry(1000, 1000),
     new THREE.MeshStandardMaterial({
         color: '#777777',
         metalness: 0.3,
@@ -104,7 +94,6 @@ const floorBody = new CANNON.Body({
     material: groundMaterial
 })
 floorBody.addShape(floorShape)
-// floorBody.position.set(0,-1,0)
 floorBody.quaternion.setFromAxisAngle(
     new CANNON.Vec3(- 1, 0, 0),
     Math.PI * .5
@@ -119,13 +108,13 @@ scene.add(ambientLight)
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1)
 directionalLight.castShadow = true
-directionalLight.shadow.mapSize.set(2048, 2048)
-directionalLight.shadow.camera.far = 150
-directionalLight.shadow.camera.left = - 40
-directionalLight.shadow.camera.top = 40
-directionalLight.shadow.camera.right = 40
-directionalLight.shadow.camera.bottom = - 40
-directionalLight.position.set(5, 40, 5)
+directionalLight.shadow.mapSize.set(4096 * 2, 4096 * 2)
+directionalLight.shadow.camera.far = 2000
+directionalLight.shadow.camera.left = - 100
+directionalLight.shadow.camera.top = 100
+directionalLight.shadow.camera.right = 100
+directionalLight.shadow.camera.bottom = - 100
+directionalLight.position.set(20, 1000, -20)
 scene.add(directionalLight)
 
 /**
@@ -155,14 +144,14 @@ window.addEventListener('resize', () =>
  * Camera
  */
 // Base camera
-const camera = new THREE.PerspectiveCamera(20, sizes.width / sizes.height, 0.1, 1000)
-camera.position.set(- 12, 6, 10)
+const camera = new THREE.PerspectiveCamera(32, sizes.width / sizes.height, 0.1, 1000)
+// camera.position.set(- 12, 6, 10)
 scene.add(camera)
 // Car camera
 const chaseCam = new THREE.Object3D()
 chaseCam.position.set(0, 0, 0)
 const chaseCamPivot = new THREE.Object3D()
-// chaseCamPivot.position.set(0, 1, 12)
+chaseCamPivot.position.set(-8, 1.5, 0)
 chaseCam.add(chaseCamPivot)
 scene.add(chaseCam)
 
@@ -182,92 +171,43 @@ renderer.setSize(sizes.width, sizes.height)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
 /**
- * Utils
- */
-const objectsToUpdate = []
-
-// Sphere
-const sphereGeometry = new THREE.SphereBufferGeometry(1, 20, 20)
-const sphereMaterial = new THREE.MeshStandardMaterial({
-    metalness: .3,
-    roughness: .4,
-    envMap: environmentMapTexture
-})
-
-const createSphere = (radius, position) => {
-    // Three.js mesh
-    const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial)
-    mesh.scale.set(radius, radius, radius)
-    mesh.castShadow = true
-    mesh.position.copy(position)
-    scene.add(mesh)
-
-    // Cannon.js body
-    const shape = new CANNON.Sphere(radius)
-    const body = new CANNON.Body({
-        mass: 1,
-        position: new CANNON.Vec3(0, 3, 0),
-        shape,
-        material: defaultMaterial
-    })
-    body.position.copy(position)
-    body.addEventListener('collide', playHitSound)
-    world.addBody(body)
-
-    // Save in objects to update
-    objectsToUpdate.push({
-        mesh,
-        body
-    })
-}
-
-// createSphere(.5, {x: 0, y: 3, z: 0})
-
-/**
  * Vehicle
  */
 const gltfLoader = new GLTFLoader()
 // Lamborghini 3D model
 let parts = 0
 let lamborghiniHuracan = null
-let position = new THREE.Vector3()
 let dimensions = new THREE.Vector3()
 gltfLoader.load(
-    'models/prova.glb',
+    'models/prova4.glb',
     (gltf) => {
         lamborghiniHuracan = gltf.scene
         parts++
-        // lamborghiniHuracan.scale.set(.01,.01,.01)
-        // lamborghiniHuracan.scale.set(.5,.5,.5)
-        lamborghiniHuracan.getWorldPosition(position)
-        console.log(position);
         const boundingBox = new THREE.Box3().setFromObject(lamborghiniHuracan)
         boundingBox.getSize(dimensions)
-        console.log(dimensions);
-        // lamborghiniHuracan.up = 0
     }
 )
-let fLWheel = null
-gltfLoader.load(
-    'models/flwheel.glb',
-    (gltf) => {
-        fLWheel = gltf.scene
-        for (const part of fLWheel.children) {
+// let fLWheel = null
+// gltfLoader.load(
+//     'models/flwheel2.glb',
+//     (gltf) => {
+//         fLWheel = gltf.scene
+//         for (const part of fLWheel.children) {
             
-            // part.geometry.translate(0, 0, .7)
-            // part.rotation.z = Math.PI
-            part.castShadow = true
-            part.receiveShadow = true
-            // part.geometry.center()
-        }
-        console.log(fLWheel);
-        parts++
-        // fLWheel.scale.set(.5,.5,.5)
-        // let wp = new THREE.Vector3()
-        // fLWheel.getWorldPosition(wp)
-        // console.log(wp);
-    }
-)
+//             // part.geometry.translate(0, 0, .7)
+//             // part.rotation.z = Math.PI
+//             part.castShadow = true
+//             part.receiveShadow = true
+//             // part.geometry.center()
+//         }
+//         console.log(fLWheel);
+//         parts++
+//         // fLWheel.scale.set(.5,.5,.5)
+//         // let wp = new THREE.Vector3()
+//         // fLWheel.getWorldPosition(wp)
+//         // console.log(wp);
+//     }
+// )
 // let fRWheel = null
 // gltfLoader.load(
 //     'models/frwheel.glb',
@@ -277,193 +217,130 @@ gltfLoader.load(
 // )
 
 const waitForCar = () => {
-    if (parts == 2) {
-        scene.add(lamborghiniHuracan)
-        console.log(lamborghiniHuracan);
+    if (parts == 1) {
         // Three.js
-        // const carBodyGeometry = new THREE.BoxGeometry(1, 1, 2)
-        // const carBodyMesh = new THREE.Mesh(carBodyGeometry, phongMaterial)
+        // Cannon.es
+        const chassisShape = new CANNON.Box(new CANNON.Vec3(dimensions.x * .5, dimensions.y * .5, dimensions.z * .5))
+        const chassisBody = new CANNON.Body({ mass: 170 })
+        chassisBody.addShape(chassisShape)
+        chassisBody.position.set(0,2,0)
+        chassisBody.angularVelocity.set(0, 0, 0)
         const carBodyMesh = lamborghiniHuracan
-        // let wheelLFMesh = null
         let wheelRFMesh = null
         let wheelRBMesh = null
         let wheelLBMesh = null
+        let wheelLFMesh = null
         for (const part of lamborghiniHuracan.children) {
-            // part.geometry.translate(0, 0, 1.3635436557324039)
+            part.geometry.translate(0, 0, .75)
             part.castShadow = true
             part.receiveShadow = true
-            // part.position.set(0,0,0)
-            // part.geometry.translate(0, -2, 0)
-            // if (part.name == "body_01") {
-                // carBodyMesh = part
-                // part.geometry.rotateX(Math.PI * .5)
-                // part.geometry.rotateY(Math.PI)
-                // carBodyMesh.quaternion.set(0,0,0)
-                // carBodyMesh.rotation.z = Math.PI * .5
-                // carBodyMesh.rotation.x = Math.PI * .5
-                // carBodyMesh.rotation.y = Math.PI * .5
-                // console.log(carBodyMesh);
-            // }
             if (part.name == "tire_01") {
                 part.geometry.center()
+                part.geometry.rotateX(Math.PI * .5)
                 wheelLBMesh = part
             }
             if (part.name == "tire_02") {
                 part.geometry.center()
+                part.geometry.rotateX(Math.PI * .5)
                 wheelRBMesh = part
             }
-            // if (part.name == "tire_03") {
-            //     part.geometry.center()
-            //     wheelLFMesh = part
-            // }
+            if (part.name == "tire_03") {
+                part.geometry.center()
+                part.geometry.rotateX(Math.PI * .5)
+                wheelLFMesh = part
+            }
             if (part.name == "tire_04") {
                 part.geometry.center()
+                part.geometry.rotateX(Math.PI * .5)
                 wheelRFMesh = part
             }
         }
-        // carBodyMesh.scale.set(.01,.01,.01)
-        carBodyMesh.position.y = 4
-        carBodyMesh.castShadow = true
+        carBodyMesh.position.copy(chassisBody.position)
         scene.add(carBodyMesh)
         carBodyMesh.add(chaseCam)
-        // Cannon.es
-        const carBodyShape = new CANNON.Box(new CANNON.Vec3(dimensions.x, dimensions.y, dimensions.z))
-        const carBody = new CANNON.Body({ mass: 50 })
-        carBody.addShape(carBodyShape)
-        carBody.position.x = carBodyMesh.position.x
-        carBody.position.y = carBodyMesh.position.y
-        carBody.position.z = carBodyMesh.position.z
-        world.addBody(carBody)
 
-        //front left wheel
-        // const wheelLFGeometry = new THREE.CylinderGeometry(
-        //     0.33,
-        //     0.33,
-        //     0.2
-        // )
-        // wheelLFGeometry.rotateZ(Math.PI / 2)
-        // const wheelLFMesh = new THREE.Mesh(wheelLFGeometry, phongMaterial)
-        // wheelLFMesh.translateX(.839)
-        // wheelLFMesh.translateY(-1.19)
-        // wheelLFMesh.translateZ(.33)
-        // wheelLFMesh.castShadow = true
-        // wheelLFMesh = fLWheel
-        // wheelLFMesh.scale.set(.01,.01,.01)
-        const wheelLFMesh = fLWheel
-        scene.add(wheelLFMesh)
-        const wheelLFShape = new CANNON.Sphere(.334)
-        const wheelLFBody = new CANNON.Body({ mass: 5, material: wheelMaterial })
-        wheelLFBody.addShape(wheelLFShape)
-        wheelLFBody.position.x = wheelLFMesh.position.x
-        wheelLFBody.position.y = wheelLFMesh.position.y
-        wheelLFBody.position.z = wheelLFMesh.position.z
-        world.addBody(wheelLFBody)
-
-        //front right wheel
-        // const wheelRFGeometry = new THREE.CylinderGeometry(
-        //     0.33,
-        //     0.33,
-        //     0.2
-        // )
-        // wheelRFGeometry.rotateZ(Math.PI / 2)
-        // const wheelRFMesh = new THREE.Mesh(wheelRFGeometry, phongMaterial)
-        // wheelRFMesh.position.y = 3
-        // wheelRFMesh.position.x = 1
-        // wheelRFMesh.position.z = -1
-        // wheelRFMesh.castShadow = true
-        // scene.add(wheelRFMesh)
-        // wheelRFMesh = fRWheel
-        // wheelRFMesh.scale.set(.01,.01,.01)
-        scene.add(wheelRFMesh)
-        const wheelRFShape = new CANNON.Sphere(.334)
-        const wheelRFBody = new CANNON.Body({ mass: 5, material: wheelMaterial })
-        wheelRFBody.addShape(wheelRFShape)
-        wheelRFBody.position.x = wheelRFMesh.position.x
-        wheelRFBody.position.y = wheelRFMesh.position.y
-        wheelRFBody.position.z = wheelRFMesh.position.z
-        world.addBody(wheelRFBody)
-
-        //back left wheel
-        // const wheelLBGeometry = new THREE.CylinderGeometry(
-        //     .4,
-        //     .4,
-        //     .33
-        // )
-        // wheelLBGeometry.rotateZ(Math.PI / 2)
-        // const wheelLBMesh = new THREE.Mesh(wheelLBGeometry, phongMaterial)
-        // wheelLBMesh.position.y = 3
-        // wheelLBMesh.position.x = -1
-        // wheelLBMesh.position.z = 1
-        // wheelLBMesh.castShadow = true
-        // wheelLBMesh.scale.set(.01,.01,.01)
-        scene.add(wheelLBMesh)
-        const wheelLBShape = new CANNON.Sphere(.35)
-        const wheelLBBody = new CANNON.Body({ mass: 5, material: wheelMaterial })
-        wheelLBBody.addShape(wheelLBShape)
-        wheelLBBody.position.x = wheelLBMesh.position.x
-        wheelLBBody.position.y = wheelLBMesh.position.y
-        wheelLBBody.position.z = wheelLBMesh.position.z
-        world.addBody(wheelLBBody)
-
-        //back right wheel
-        // const wheelRBGeometry = new THREE.CylinderGeometry(
-        //     .4,
-        //     .4,
-        //     .33
-        // )
-        // wheelRBGeometry.rotateZ(Math.PI / 2)
-        // const wheelRBMesh = new THREE.Mesh(wheelRBGeometry, phongMaterial)
-        // wheelRBMesh.position.y = 3
-        // wheelRBMesh.position.x = 1
-        // wheelRBMesh.position.z = 1
-        // wheelRBMesh.castShadow = true
-        // wheelRBMesh.scale.set(.01,.01,.01)
-        scene.add(wheelRBMesh)
-        const wheelRBShape = new CANNON.Sphere(.35)
-        const wheelRBBody = new CANNON.Body({ mass: 5, material: wheelMaterial })
-        wheelRBBody.addShape(wheelRBShape)
-        wheelRBBody.position.x = wheelRBMesh.position.x
-        wheelRBBody.position.y = wheelRBMesh.position.y
-        wheelRBBody.position.z = wheelRBMesh.position.z
-        world.addBody(wheelRBBody)
-
-        const leftFrontAxis = new CANNON.Vec3(1, 0, 0)
-        const rightFrontAxis = new CANNON.Vec3(1, 0, 0)
-        const leftBackAxis = new CANNON.Vec3(1, 0, 0)
-        const rightBackAxis = new CANNON.Vec3(1, 0, 0)
-
-        const constraintLF = new CANNON.HingeConstraint(carBody, wheelLFBody, {
-            pivotA: new CANNON.Vec3(-.833, -1, -1.19133),
-            axisA: leftFrontAxis,
-            maxForce: 200,
-            // collideConnected: false
+        
+        const vehicle = new CANNON.RaycastVehicle({
+            chassisBody,
         })
-        world.addConstraint(constraintLF)
-        const constraintRF = new CANNON.HingeConstraint(carBody, wheelRFBody, {
-            pivotA: new CANNON.Vec3(.833, -1, -1.19133),
-            axisA: rightFrontAxis,
-            maxForce: 200,
-            // collideConnected: false
-        })
-        world.addConstraint(constraintRF)
-        const constraintLB = new CANNON.HingeConstraint(carBody, wheelLBBody, {
-            pivotA: new CANNON.Vec3(-.8257, -1, 1.41825),
-            axisA: leftBackAxis,
-            maxForce: 200,
-            // collideConnected: false
-        })
-        world.addConstraint(constraintLB)
-        const constraintRB = new CANNON.HingeConstraint(carBody, wheelRBBody, {
-            pivotA: new CANNON.Vec3(.8257, -1, 1.41825),
-            axisA: rightBackAxis,
-            maxForce: 200,
-            // collideConnected: false
-        })
-        world.addConstraint(constraintRB)
 
-        //rear wheel drive
-        constraintLB.enableMotor()
-        constraintRB.enableMotor()
+        const wheelOptions = {
+            radius: .5,
+            directionLocal: new CANNON.Vec3(0, -1, 0),
+            suspensionStiffness: 200,
+            suspensionRestLength: .05,
+            frictionSlip: 3.4,
+            dampingRelaxation: 10,
+            dampingCompression: 6.4,
+            maxSuspensionForce: 500000,
+            rollInfluence: .01,
+            axleLocal: new CANNON.Vec3(0, 0, 1),
+            chassisConnectionPointLocal: new CANNON.Vec3(-1, 0, 1),
+            maxSuspensionTravel: 0.2,
+            customSlidingRotationalSpeed: -5,
+            useCustomSlidingRotationalSpeed: true,
+        }
+
+        const front = {
+            x: 1.42878,
+            y: -.338002,
+            z: .83953,
+            radius: .334
+        }
+        const back = {
+            x: -1.17947,
+            y: -.354402,
+            z: .82571,
+            radius: .35
+        }
+
+        const wheelMeshes = []
+
+        // front left
+        wheelOptions.chassisConnectionPointLocal.set(front.x, front.y, -front.z)
+        wheelOptions.radius = front.radius
+        vehicle.addWheel(wheelOptions)
+        wheelMeshes.push(wheelLFMesh)
+
+        // front right
+        wheelOptions.chassisConnectionPointLocal.set(front.x, front.y, front.z)
+        wheelOptions.radius = front.radius
+        vehicle.addWheel(wheelOptions)
+        wheelMeshes.push(wheelRFMesh)
+        
+        // back left
+        wheelOptions.chassisConnectionPointLocal.set(back.x, back.y, -back.z)
+        wheelOptions.radius = back.radius
+        vehicle.addWheel(wheelOptions)
+        wheelMeshes.push(wheelLBMesh)
+        
+        // back right
+        wheelOptions.chassisConnectionPointLocal.set(back.x, back.y, back.z)
+        wheelOptions.radius = back.radius
+        vehicle.addWheel(wheelOptions)
+        wheelMeshes.push(wheelRBMesh)
+
+        wheelMeshes.forEach(mesh => scene.add(mesh))
+        
+        vehicle.addToWorld(world)
+
+        console.log(vehicle);
+        
+        // Add the wheel bodies
+        const wheelBodies = []
+        vehicle.wheelInfos.forEach((wheel) => {
+            const cylinderShape = new CANNON.Cylinder(wheel.radius, wheel.radius, wheel.radius / 2, 20)
+            const wheelBody = new CANNON.Body({
+                mass: 0,
+                material: wheelMaterial,
+            })
+            wheelBody.type = CANNON.Body.KINEMATIC
+            wheelBody.collisionFilterGroup = 0 // turn off collisions
+            const quaternion = new CANNON.Quaternion().setFromEuler(-Math.PI / 2, 0, 0)
+            wheelBody.addShape(cylinderShape, new CANNON.Vec3(), quaternion)
+            wheelBodies.push(wheelBody)
+            world.addBody(wheelBody)
+        })
 
         const keyMap = {}
         const onDocumentKey = (e) => {
@@ -471,24 +348,9 @@ const waitForCar = () => {
             return false
         }
 
-        let forwardVelocity = 0
-        let rightVelocity = 0
-
         document.addEventListener('keydown', onDocumentKey, false)
         document.addEventListener('keyup', onDocumentKey, false)
-
-        // let mouse = false
-        // document.addEventListener('mousedown', () => {
-        //     mouse = true
-        //     console.log(mouse);
-        // })
-        // document.addEventListener('mouseup', () => {
-        //     mouse = false
-        //     console.log(mouse);
-        // })
-
-
-
+        
         /**
          * Animate
          */
@@ -496,9 +358,22 @@ const waitForCar = () => {
         let oldElapsedTime = 0
 
         const v = new THREE.Vector3()
-        let thrusting = false
+        
+        let driving = false
         let steering = false
-
+        let breaking = false
+        
+        const maxSteering = 0.5
+        const steeringAcceleration = .05
+        const maxfwVelocity = 325
+        const maxbwVelocity = -50
+        const fwAcceleration = 590
+        const bwAcceleration = - (fwAcceleration / 3)
+        const engineBreak = 50
+        let brakeForce = 0
+        let forwardVelocity = 0
+        let steeringAngle = 0
+        let acceleration = 0
 
         const tick = () =>
         {
@@ -507,135 +382,89 @@ const waitForCar = () => {
             oldElapsedTime = elapsedTime
 
             // Update physics world
-
             world.step(1 / 60, deltaTime, 3)
 
             // Copy coordinates from Cannon to Three.js
-            carBodyMesh.position.set(
-                carBody.position.x,
-                carBody.position.y,
-                carBody.position.z
-            )
-            carBodyMesh.quaternion.set(
-                carBody.quaternion.x,
-                carBody.quaternion.y,
-                carBody.quaternion.z,
-                carBody.quaternion.w
-            )
-
-            wheelLFMesh.position.set(
-                wheelLFBody.position.x,
-                wheelLFBody.position.y,
-                wheelLFBody.position.z
-            )
-            wheelLFMesh.quaternion.set(
-                wheelLFBody.quaternion.x,
-                wheelLFBody.quaternion.y,
-                wheelLFBody.quaternion.z,
-                wheelLFBody.quaternion.w
-            )
-
-            wheelRFMesh.position.set(
-                wheelRFBody.position.x,
-                wheelRFBody.position.y,
-                wheelRFBody.position.z
-            )
-            wheelRFMesh.quaternion.set(
-                wheelRFBody.quaternion.x,
-                wheelRFBody.quaternion.y,
-                wheelRFBody.quaternion.z,
-                wheelRFBody.quaternion.w
-            )
-
-            wheelLBMesh.position.set(
-                wheelLBBody.position.x,
-                wheelLBBody.position.y,
-                wheelLBBody.position.z
-            )
-            wheelLBMesh.quaternion.set(
-                wheelLBBody.quaternion.x,
-                wheelLBBody.quaternion.y,
-                wheelLBBody.quaternion.z,
-                wheelLBBody.quaternion.w
-            )
-
-            wheelRBMesh.position.set(
-                wheelRBBody.position.x,
-                wheelRBBody.position.y,
-                wheelRBBody.position.z
-            )
-            wheelRBMesh.quaternion.set(
-                wheelRBBody.quaternion.x,
-                wheelRBBody.quaternion.y,
-                wheelRBBody.quaternion.z,
-                wheelRBBody.quaternion.w
-            )
+            carBodyMesh.position.copy(chassisBody.position)
+            carBodyMesh.quaternion.copy(chassisBody.quaternion)
+            for (let i = 0; i < wheelMeshes.length; i++) {
+                vehicle.updateWheelTransform(i)
+                const transform = vehicle.wheelInfos[i].worldTransform
+                const wheelMesh = wheelMeshes[i]
+                wheelMesh.position.copy(transform.position)
+                wheelMesh.quaternion.copy(transform.quaternion)
+            }
 
             // move vehicle
-            thrusting = false
+            driving = false
             steering = false
-            if (keyMap['w']) {
-                if (forwardVelocity < 10.0) forwardVelocity += .1
-                thrusting = true
+            breaking = false
+            forwardVelocity = vehicle.currentVehicleSpeedKmHour
+            // key map
+            if (keyMap['w'] || keyMap['ArrowUp']) {
+                driving = true
+                if (forwardVelocity < maxfwVelocity) acceleration = fwAcceleration
             }
-            if (keyMap['s']) {
-                if (forwardVelocity > -10.0) forwardVelocity -= .1
-                thrusting = true
+            if (keyMap['s'] || keyMap['ArrowDown']) {
+                driving = true
+                if (forwardVelocity > maxbwVelocity) acceleration = bwAcceleration
             }
-            if (keyMap['a']) {
-                if (rightVelocity > -.5) rightVelocity -= 0.05
+            if (keyMap['a'] || keyMap['ArrowLeft']) {
                 steering = true
+                if (steeringAngle < maxSteering) steeringAngle += steeringAcceleration
             }
-            if (keyMap['d']) {
-                if (rightVelocity < .5) rightVelocity += 0.05
+            if (keyMap['d'] || keyMap['ArrowRight']) {
                 steering = true
+                if (steeringAngle > -maxSteering) steeringAngle -= steeringAcceleration
             }
             if (keyMap[' ']) {
-                if (forwardVelocity > 0) {
-                    forwardVelocity -= .3
-                }
-                if (forwardVelocity < 0) {
-                    forwardVelocity += .3
-                }
+                breaking = true
+                if (driving) acceleration = 0
+                if (forwardVelocity != 0) brakeForce = 17
             }
             
-            
-            if (!thrusting) {
-                //not going forward or backwards so gradually slow down
-                if (forwardVelocity > 0) {
-                    forwardVelocity -= 0.05
-                }
-                if (forwardVelocity < 0) {
-                    forwardVelocity += 0.05
-                }
+            // slowdown
+            if (!driving) {
+                if (forwardVelocity > .05) acceleration = -engineBreak
+                else if (forwardVelocity < -.05) acceleration = engineBreak
+                else acceleration = 0
             }
+            // repositioning steering angle
             if (!steering) {
-                if (rightVelocity > 0) {
-                    rightVelocity -= .05
-                }
-                if (rightVelocity < 0) {
-                    rightVelocity += .05
-                }
+                if (steeringAngle > .05) steeringAngle -= .05
+                else if (steeringAngle < -.05) steeringAngle += .05
+                else steeringAngle = 0
             }
+            // not breaking
+            if (!breaking) brakeForce = 0
+
+            // apply acceleration
+            vehicle.applyEngineForce(acceleration, 0)
+            vehicle.applyEngineForce(acceleration, 1)
+            vehicle.applyEngineForce(acceleration, 2)
+            vehicle.applyEngineForce(acceleration, 3)
+
+            // apply steering force
+            vehicle.setSteeringValue(steeringAngle, 0)
+            vehicle.setSteeringValue(steeringAngle, 1)
+
+            // apply brake force
+            vehicle.setBrake(brakeForce, 2)
+            vehicle.setBrake(brakeForce, 3)
             
-            constraintLB.setMotorSpeed(forwardVelocity)
-            constraintRB.setMotorSpeed(forwardVelocity)
-            constraintLF.axisA.z = rightVelocity
-            constraintRF.axisA.z = rightVelocity
-
             // if (!mouse) {
-                // camera.lookAt(carBodyMesh.position)
+                camera.lookAt(carBodyMesh.position)
 
-                // chaseCamPivot.getWorldPosition(v)
-                // if (v.y < 1) {
-                //     v.y = 1
-                // }
-                // camera.position.lerpVectors(camera.position, v, 0.05)
+                chaseCamPivot.getWorldPosition(v)
+                if (v.y < 1) {
+                    v.y = 1
+                }
+                camera.position.lerpVectors(camera.position, v, .1)
             // }
 
 
             // Update controls
-            controls.update()
+            // controls.update()
 
             // Render
             renderer.render(scene, camera)
