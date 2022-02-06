@@ -35,16 +35,24 @@ const scene = new THREE.Scene()
  * Textures
  */
 const textureLoader = new THREE.TextureLoader()
+const asphalt = textureLoader.load('/textures/asphalt/asphalt.png')
+asphalt.repeat.set(500,500)
+asphalt.wrapS = THREE.RepeatWrapping
+asphalt.wrapT = THREE.RepeatWrapping
+
 const cubeTextureLoader = new THREE.CubeTextureLoader()
 
 const environmentMapTexture = cubeTextureLoader.load([
-    '/textures/environmentMaps/0/px.png',
-    '/textures/environmentMaps/0/nx.png',
-    '/textures/environmentMaps/0/py.png',
-    '/textures/environmentMaps/0/ny.png',
-    '/textures/environmentMaps/0/pz.png',
-    '/textures/environmentMaps/0/nz.png'
+    '/textures/environmentMaps/5/px.png',
+    '/textures/environmentMaps/5/nx.png',
+    '/textures/environmentMaps/5/py.png',
+    '/textures/environmentMaps/5/ny.png',
+    '/textures/environmentMaps/5/pz.png',
+    '/textures/environmentMaps/5/nz.png'
 ])
+
+// scene.background = environmentMapTexture
+environmentMapTexture.encoding = THREE.sRGBEncoding
 
 /**
  * Physics
@@ -77,11 +85,12 @@ world.defaultContactMaterial.friction = 0
 const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(1000, 1000),
     new THREE.MeshStandardMaterial({
-        color: '#777777',
-        metalness: 0.3,
-        roughness: 0.4,
-        envMap: environmentMapTexture,
-        envMapIntensity: 0.5
+        color: '#777',
+        // metalness: 0.3,
+        roughness: 0,
+        // envMap: environmentMapTexture,
+        map: asphalt,
+        // envMapIntensity: 0.5
     })
 )
 floor.receiveShadow = true
@@ -103,18 +112,19 @@ world.addBody(floorBody)
 /**
  * Lights
  */
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
+const ambientLight = new THREE.AmbientLight(0xffffff, .1)
 scene.add(ambientLight)
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1)
 directionalLight.castShadow = true
 directionalLight.shadow.mapSize.set(4096 * 2, 4096 * 2)
-directionalLight.shadow.camera.far = 2000
+directionalLight.shadow.camera.far = 200
 directionalLight.shadow.camera.left = - 100
 directionalLight.shadow.camera.top = 100
 directionalLight.shadow.camera.right = 100
 directionalLight.shadow.camera.bottom = - 100
-directionalLight.position.set(20, 1000, -20)
+directionalLight.shadow.normalBias = 0.05
+directionalLight.position.set(-20, 10, -20)
 scene.add(directionalLight)
 
 /**
@@ -145,7 +155,7 @@ window.addEventListener('resize', () =>
  */
 // Base camera
 const camera = new THREE.PerspectiveCamera(32, sizes.width / sizes.height, 0.1, 1000)
-// camera.position.set(- 12, 6, 10)
+camera.position.set(- 8, 1.5, 0)
 scene.add(camera)
 // Car camera
 const chaseCam = new THREE.Object3D()
@@ -163,12 +173,31 @@ controls.enableDamping = true
  * Renderer
  */
 const renderer = new THREE.WebGLRenderer({
-    canvas: canvas
+    canvas: canvas,
+    antialias: true
 })
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
 renderer.setSize(sizes.width, sizes.height)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+renderer.physicallyCorrectLights = true
+renderer.outputEncoding = THREE.sRGBEncoding
+renderer.toneMapping = THREE.ACESFilmicToneMapping
+renderer.toneMappingExposure = 3
+
+/**
+ * Update all materials
+ */
+const updateAllMaterials = () => {
+    scene.traverse(child => {
+        if(child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial)
+        {
+            child.material.envMap = environmentMapTexture
+            child.material.envMapIntensity = 2.5
+        }
+
+    })
+}
 
 /**
  * Vehicle
@@ -179,45 +208,70 @@ let parts = 0
 let lamborghiniHuracan = null
 let dimensions = new THREE.Vector3()
 gltfLoader.load(
-    'models/prova4.glb',
+    'models/body.glb',
     (gltf) => {
         lamborghiniHuracan = gltf.scene
+        // updateAllMaterials()
         parts++
         const boundingBox = new THREE.Box3().setFromObject(lamborghiniHuracan)
         boundingBox.getSize(dimensions)
     }
 )
-// let fLWheel = null
-// gltfLoader.load(
-//     'models/flwheel2.glb',
-//     (gltf) => {
-//         fLWheel = gltf.scene
-//         for (const part of fLWheel.children) {
-            
-//             // part.geometry.translate(0, 0, .7)
-//             // part.rotation.z = Math.PI
-//             part.castShadow = true
-//             part.receiveShadow = true
-//             // part.geometry.center()
-//         }
-//         console.log(fLWheel);
-//         parts++
-//         // fLWheel.scale.set(.5,.5,.5)
-//         // let wp = new THREE.Vector3()
-//         // fLWheel.getWorldPosition(wp)
-//         // console.log(wp);
-//     }
-// )
-// let fRWheel = null
-// gltfLoader.load(
-//     'models/frwheel.glb',
-//     (gltf) => {
-//         fRWheel = gltf.scene
-//     }
-// )
+let fLWheel = null
+gltfLoader.load(
+    'models/flwheel.glb',
+    (gltf) => {
+        fLWheel = gltf.scene
+        for (const part of fLWheel.children) {
+            part.castShadow = true
+            part.receiveShadow = true
+            part.material.envMap = environmentMapTexture
+        }
+        parts++
+    }
+)
+let fRWheel = null
+gltfLoader.load(
+    'models/frwheel.glb',
+    (gltf) => {
+        fRWheel = gltf.scene
+        for (const part of fRWheel.children) {
+            part.castShadow = true
+            part.receiveShadow = true
+            part.material.envMap = environmentMapTexture
+        }
+        parts++
+    }
+)
+let bLWheel = null
+gltfLoader.load(
+    'models/blwheel.glb',
+    (gltf) => {
+        bLWheel = gltf.scene
+        for (const part of bLWheel.children) {
+            part.castShadow = true
+            part.receiveShadow = true
+            part.material.envMap = environmentMapTexture
+        }
+        parts++
+    }
+)
+let bRWheel = null
+gltfLoader.load(
+    'models/brwheel.glb',
+    (gltf) => {
+        bRWheel = gltf.scene
+        for (const part of bRWheel.children) {
+            part.castShadow = true
+            part.receiveShadow = true
+            part.material.envMap = environmentMapTexture
+        }
+        parts++
+    }
+)
 
 const waitForCar = () => {
-    if (parts == 1) {
+    if (parts == 5) {
         // Three.js
         // Cannon.es
         const chassisShape = new CANNON.Box(new CANNON.Vec3(dimensions.x * .5, dimensions.y * .5, dimensions.z * .5))
@@ -231,29 +285,10 @@ const waitForCar = () => {
         let wheelLBMesh = null
         let wheelLFMesh = null
         for (const part of lamborghiniHuracan.children) {
-            part.geometry.translate(0, 0, .75)
+            part.geometry.translate(0, 0, .74)
             part.castShadow = true
             part.receiveShadow = true
-            if (part.name == "tire_01") {
-                part.geometry.center()
-                part.geometry.rotateX(Math.PI * .5)
-                wheelLBMesh = part
-            }
-            if (part.name == "tire_02") {
-                part.geometry.center()
-                part.geometry.rotateX(Math.PI * .5)
-                wheelRBMesh = part
-            }
-            if (part.name == "tire_03") {
-                part.geometry.center()
-                part.geometry.rotateX(Math.PI * .5)
-                wheelLFMesh = part
-            }
-            if (part.name == "tire_04") {
-                part.geometry.center()
-                part.geometry.rotateX(Math.PI * .5)
-                wheelRFMesh = part
-            }
+            part.material.envMap = environmentMapTexture
         }
         carBodyMesh.position.copy(chassisBody.position)
         scene.add(carBodyMesh)
@@ -283,7 +318,7 @@ const waitForCar = () => {
 
         const front = {
             x: 1.42878,
-            y: -.338002,
+            y: -.358002,
             z: .83953,
             radius: .334
         }
@@ -300,24 +335,28 @@ const waitForCar = () => {
         wheelOptions.chassisConnectionPointLocal.set(front.x, front.y, -front.z)
         wheelOptions.radius = front.radius
         vehicle.addWheel(wheelOptions)
+        wheelLFMesh = fLWheel
         wheelMeshes.push(wheelLFMesh)
 
         // front right
         wheelOptions.chassisConnectionPointLocal.set(front.x, front.y, front.z)
         wheelOptions.radius = front.radius
         vehicle.addWheel(wheelOptions)
+        wheelRFMesh = fRWheel
         wheelMeshes.push(wheelRFMesh)
         
         // back left
         wheelOptions.chassisConnectionPointLocal.set(back.x, back.y, -back.z)
         wheelOptions.radius = back.radius
         vehicle.addWheel(wheelOptions)
+        wheelLBMesh = bLWheel
         wheelMeshes.push(wheelLBMesh)
         
         // back right
         wheelOptions.chassisConnectionPointLocal.set(back.x, back.y, back.z)
         wheelOptions.radius = back.radius
         vehicle.addWheel(wheelOptions)
+        wheelRBMesh = bRWheel
         wheelMeshes.push(wheelRBMesh)
 
         wheelMeshes.forEach(mesh => scene.add(mesh))
@@ -351,6 +390,10 @@ const waitForCar = () => {
         document.addEventListener('keydown', onDocumentKey, false)
         document.addEventListener('keyup', onDocumentKey, false)
         
+        let mouse = false
+        document.addEventListener('mousedown', () => mouse = true)
+        document.addEventListener('mouseup', () => mouse = false)
+
         /**
          * Animate
          */
@@ -452,19 +495,21 @@ const waitForCar = () => {
             vehicle.setBrake(brakeForce, 2)
             vehicle.setBrake(brakeForce, 3)
             
+            // camera.lookAt(carBodyMesh.position)
+            // chaseCamPivot.getWorldPosition(v)
+            // if (v.y < 1) {
+            //     v.y = 1
+            // }
+            // camera.position.lerpVectors(camera.position, v, .05)
             // if (!mouse) {
-                camera.lookAt(carBodyMesh.position)
-
-                chaseCamPivot.getWorldPosition(v)
-                if (v.y < 1) {
-                    v.y = 1
-                }
-                camera.position.lerpVectors(camera.position, v, .1)
+            //     controls.object = camera
+            // } else {
+            //     controls.object = chaseCamPivot
             // }
 
 
             // Update controls
-            // controls.update()
+            controls.update()
 
             // Render
             renderer.render(scene, camera)
